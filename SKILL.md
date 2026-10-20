@@ -23,9 +23,10 @@ metadata:
 
 ## 免 HA 的客户端
 
-`scripts/lipro_api.py` —— 纯 stdlib，不依赖 Home Assistant，提供登录 / 设备查询 /
-分组状态读取，以及 token 刷新与请求签发能力。**控制命令**由 `scripts/lipro_ctl.py`
-构造并下发（见下方「控制命令」）。
+`scripts/lipro_api.py` —— 纯 stdlib，不依赖 Home Assistant。提供 login / devices /
+group-state 等查询能力，以及 token 刷新与请求签发能力；同时被 `scripts/lipro_ctl.py`
+复用以下发分组控制命令（写操作须经 `lipro_ctl.sh` 的 dry-run / `--apply` 门，
+见下方「控制命令」）。
 
 > ⚠️ **「签名算法已实测通过」这句话在 v1.0 是误导性的** —— 那只验证了 MD5 公式自洽
 > （与源码常量独立手算一致），**从未验证过真实 HTTP 层能通**。v2.0 才真跑通（见下方「四个实测坑」）。
