@@ -1,1 +1,5 @@
 blank_issues_enabled: false
+contact_links:
+  - name: 这类需求本项目帮不上忙
+    url: https://github.com/xeology13/lipro-smart-light-api#使用边界与禁止事项
+    about: 批量操作、绕过风控、操作他人账号或设备等需求，请先看使用边界与禁止事项
