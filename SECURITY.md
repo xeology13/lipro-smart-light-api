@@ -20,14 +20,14 @@
 
 ## 报告漏洞
 
-如果你在本项目中发现安全问题，请**不要**开公开 Issue。
+如果你在本项目中发现安全问题，请**不要**在公开 Issue 里写技术细节。
 
-请走 GitHub 的**私密漏洞报告**：仓库页右侧栏的 **Security** 标签
-（https://github.com/xeology13/lipro-smart-light-api/security ）
-→ **Report a vulnerability**。
+**报告方式**：开一个公开 Issue，但正文**只写一行**「有一个安全问题，细节请私信」，
+不要附复现步骤、日志或代码；我会看到后转成私密渠道跟你对接。
 
-如果该入口不可用，可以开一个**不含技术细节**的公开 Issue 说明
-「有一个安全问题，细节请私信」，我会转到私密渠道跟进。
+> ⚠️ 本仓库暂未启用 GitHub 的私密漏洞报告（Private vulnerability reporting），
+> 因此 `/security` 页面上没有 **Report a vulnerability** 按钮。
+> 若将来启用了，这里会更新为优先使用该入口。
 
 ### 报告内容建议
 
