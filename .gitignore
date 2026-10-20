@@ -1,0 +1,27 @@
+# 凭据与敏感产物 —— 永远不进 git
+*.key
+*.token
+*.env
+.env
+credential*
+secret*
+creds*.json
+
+# 日志与临时文件
+*.log
+*.tmp
+scratch/
+*.bak
+*.bak-*
+*.orig
+*.rej
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# macOS
+.DS_Store

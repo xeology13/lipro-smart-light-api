@@ -1,0 +1,246 @@
+# LIPRO 智能灯云端 API 逆向实现
+
+LIPRO（黎普）智能灯的**云端控制 API** 逆向实现 + Hermes skill。
+
+LIPRO 官方**没有开放平台**，无法申请 AppID/AppKey。本项目通过逆向其移动端
+与第三方集成的调用方式，弄清了云端接口的鉴权、ID 空间与命令格式，
+从而实现不依赖 Home Assistant 也能直接控制灯。
+
+> 接口逆向自 [Exlany/lipro-hass](https://github.com/Exlany/lipro-hass)（MIT 许可）。
+> 本仓库是**独立重写**，未复制其代码，仅参考调用链与字段语义。
+
+---
+
+## 支持范围
+
+**只支持两类灯**（均已实发验证 + 人工确认）：
+
+| 类型 | `physicalModel` | `deviceType` | 可控属性 |
+|---|---|---|---|
+| 普通灯 | `light` | `ff000001` | `brightness` / `temperature` / `POWER_ON` / `POWER_OFF` |
+| 风扇灯 | `fanLight` | `ff000004` | 以上 + `fanOnoff` / `fanGear` |
+
+窗帘、面板、传感器、插座、台灯等**刻意未实现** —— 没有验证过就不猜。
+遇到不支持的设备会**直接报错**，而不是猜一个 `deviceType` 发到云端。
+
+---
+
+## 环境要求
+
+- **macOS** 或 Linux —— 只用 bash + Python 标准库，无系统依赖
+- `/usr/bin/python3` —— 脚本只用标准库，无需 pip 安装任何东西
+- 能直连 LIPRO 云端（境内线路，实测无需代理）
+
+---
+
+## 快速开始
+
+### 1. 设置凭据
+
+```bash
+export LIPRO_PHONE=<手机号>
+export LIPRO_PASSWORD='<密码>'
+```
+
+**本项目不做任何持久化存储** —— 没有系统钥匙串、没有密码管理器、没有明文文件。
+终端里不设这两个变量时，脚本会自动提示输入（密码不回显）。
+
+⚠️ 非交互环境（agent / CI / ssh）无法提示输入，**必须先 export**。
+
+### 2. 确认凭据状态
+
+```bash
+bash scripts/lipro_cred.sh status
+```
+
+```text
+  LIPRO_PASSWORD : 已设置，长度 16 字节
+  LIPRO_PHONE    : 已设置
+
+  持久化存储: 无（本项目不做任何落盘/钥匙串/密码管理器）
+```
+
+⚠️ **只报长度，绝不显示明文** —— stdout 会进 agent 对话上下文，
+明文一旦打出来就等于泄漏进聊天记录。
+
+### 3. 列出你账号下的灯
+
+```bash
+bash scripts/lipro_ctl.sh --list
+```
+
+```text
+serial           名称       房间   类型         deviceId
+mesh_group_xxxxx 你的灯名     你的房间  light        <数字>
+mesh_group_xxxxx 你的灯名     你的房间  fanLight     <数字>
+```
+
+`<serial>` 就是第一列，写命令时用它。
+
+### 4. 控制灯
+
+```bash
+CTL=scripts/lipro_ctl.sh
+
+$CTL <serial> brightness=60                     # dry-run：只打印请求体
+$CTL <serial> brightness=60 --apply             # 真发 + 写后轮询回读
+$CTL <serial> --command POWER_OFF --apply       # 整灯关（自动补 powerState=0）
+$CTL <serial> fanOnoff=1 --apply                # 开风扇（仅 fanLight）
+```
+
+---
+
+## ⚠️ 最重要的三条约束
+
+### 1. 默认 dry-run，不加 `--apply` 绝不下发
+
+不加 `--apply` 时脚本只打印将要发送的请求体，不会碰任何设备。
+**养成先 dry-run 看一眼的习惯。**
+
+### 2. 云端说成功 ≠ 灯真的动了
+
+```
+下发 POWER_OFF → code=0000, pushSuccess=true, 回读 powerState: 1→0   ← 三处都说成功
+物理          → 灯还亮着
+```
+
+`pushSuccess: true` 和云端回读**都不是物理真相** —— 云端会照命令乐观写入。
+
+**唯一可靠的判据是：写后轮询回读 + 人眼确认。**
+脚本提供 `--wait`（写后轮询秒数，默认 15），但它**不能替代人眼确认**。
+
+⚠️ 曾踩过的最贵一坑：发完 `POWER_OFF`，7 秒后又发了一条「恢复亮度」。
+网关把属性写入当成开机动作，**把刚关的灯又打开了**，
+然后据此得出「`POWER_OFF` 命令无效」的错误结论。
+
+**→ 写完命令后，不要立刻追加任何其他命令。**
+
+### 3. 关灯态下不能调属性
+
+灯关着时写 `brightness` / `temperature` 会被**网关直接丢弃**（回读不变）。
+必须先 `POWER_ON`，等设备状态更新，再分两步调属性。
+
+⚠️ `POWER_ON` 和属性写**同批下发会互相干扰**，同样会失败。
+
+---
+
+## 目录结构
+
+```
+lipro-smart-light-api/
+├── README.md              本文件（中文）
+├── SKILL.md               完整技术文档：API 细节、踩坑记录、字段语义
+├── .gitignore
+└── scripts/
+    ├── lipro_ctl.sh       控制入口（bash 包装，负责加载凭据）
+    ├── lipro_ctl.py       控制逻辑（构造请求体、写后轮询）
+    ├── lipro_cred.sh      凭据加载（环境变量优先，无则交互提示）
+    └── lipro_api.py       API 底层（登录、token 刷新、设备列表、分组状态）
+```
+
+**SKILL.md 是主要技术文档**，包含完整的接口说明、字段语义对照和踩坑记录。
+
+---
+
+## 凭据处理
+
+**本项目不做任何持久化存储** —— 没有系统钥匙串、没有密码管理器、没有明文文件。
+凭据只存在于 shell 变量和当前进程的环境里，**进程退出即消失**。
+
+### 设置凭据
+
+```bash
+export LIPRO_PHONE=<手机号>       # 11 位
+export LIPRO_PASSWORD='<密码>'    # 16 位，建议加单引号
+```
+
+未设置环境变量时，若当前是**交互式终端**（你在终端里手动敲命令），
+脚本会自动提示输入，密码不回显。
+**非交互环境（agent / CI / ssh 管道）会直接报错退出，不会卡死等输入。**
+
+查看当前状态：
+
+```bash
+bash scripts/lipro_cred.sh status
+```
+
+### 代价：没有 refresh_token 可复用
+
+登录接口会同时返回 `access_token` 和 `refresh_token`。
+**本项目不存 refresh_token**，所以每条命令都重新走一次账号密码登录：
+
+| 方案 | 认证路径 | 耗时 | 代价 |
+|---|---|---|---|
+| 本项目（不持久化） | 每次账号密码登录 | ~1.0s/条 | 高频调用更易撞风控 |
+| 存 rt | rt 刷新 | ~0.5s/条 | 需持久化一个一次性凭据 |
+
+⚠️ rt 是**一次性**的（每次刷新即轮换），要存就必须每次刷新后回写。
+**如果需要高频调用，建议在 shell 层做缓存**（如 `direnv`），
+而不是让本项目自己存凭据。
+
+### 密码绝不能出现在这些地方
+
+| 位置 | 是否安全 | 原因 |
+|---|---|---|
+| `export LIPRO_PASSWORD` | ✅ | 只在本进程环境；history 记的是命令本身 |
+| 交互式输入（`read -rs`） | ✅ | 不回显、不进 argv |
+| 命令行参数 `--password xxx` | ❌ | `ps aux` 全机可见 |
+| 写进项目内 `.env` | ❌ | 会进 git |
+| 写进 `~/.zshrc` | ⚠️ | 明文落盘且被所有子进程继承，需确保权限 `600` |
+
+### 换账号
+
+```bash
+export LIPRO_PHONE=<新手机号>
+export LIPRO_PASSWORD='<新密码>'
+```
+
+因为没有持久化存储，**换账号只需改环境变量**，
+不存在「旧 token 串到旧账号」这类问题。
+
+### 换机器
+
+脚本零硬编码 —— 设备清单每次从云端实时拉取，
+路径从脚本自身位置推导，装在任何目录都能跑。
+
+⚠️ 每台机器都要各自设置环境变量 —— 凭据不进仓库、不跨机共享。
+
+---
+
+## 常见问题
+
+**Q：`140013 未找到群组，请复位后重新配网`？**
+
+⚠️ **这个提示是误导性的。** 真实原因是 ID 空间用错了，不是设备故障 ——
+不要照着提示去复位或重新配网。
+
+| 字段 | 形态 | 哪个 API 面用 |
+|---|---|---|
+| `deviceId` | `<数字>` | Smart Home 面 |
+| `serial` | `mesh_group_<数字>` | IoT 面的 `groupIdList` |
+
+**Q：成功码怎么判断？**
+
+有三种形态，**必须都认**：字符串 `"0000"`、数字 `0`、以及嵌套在 `data` 里的。
+IoT 面返回的是**字符串** `"0000"`，跟数字 `0` 恒不相等 —— 这是个经典陷阱。
+
+**Q：为什么 App 里找不到网关？**
+
+因为**没有独立的网关设备实体**。云端返回的分组里
+`gatewayDeviceId` 指向该分组自己的 `deviceId`，每盏灯各自就是一个 Mesh 节点。
+
+**Q：同型号的灯会不会串？**
+
+不会。`iotName` 在同型号之间会重名，但云端**按 `deviceId` 路由**，
+`iotName` 不是路由依据。
+
+---
+
+## 许可与致谢
+
+本仓库代码为独立实现。上游 [Exlany/lipro-hass](https://github.com/Exlany/lipro-hass)
+采用 MIT 许可，本项目**未复制其代码**，仅参考其逆向得出的接口调用链。
+
+LIPRO 是魅族（MEIZU）旗下智能家居品牌，其云后端为魅族基础设施
+（`api-hilbert.lipro.com` 的 CNAME 指向 `mce-gateway.flyme.com`）。
+灯在网络上表现为魅族 OUI 属正常现象。
