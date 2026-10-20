@@ -2,7 +2,11 @@
 """LIPRO 云端 API 客户端 —— 独立实现（MIT License）。
 
 本文件为独立编写的协议客户端，实现 LIPRO 云端的登录、设备查询、token 刷新
-与分组控制接口。
+与分组状态查询。
+
+⚠️ **本文件不含设备控制能力** —— 它的请求路径全部是 query/token/index，
+没有任何 control 路径。分组控制命令由 `scripts/lipro_ctl.py` 构造并下发
+（写操作须经 `lipro_ctl.sh` 的 dry-run / `--apply` 门）。
 
 接口路径、字段语义与部分协议常量参考了开源项目 Exlany/lipro-hass
 （MIT License, Copyright (c) 2025 Exlany），特此致谢并遵循其 MIT 许可条款；
