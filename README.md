@@ -135,7 +135,14 @@ $CTL <serial> fanOnoff=1 --apply                # 开风扇（仅 fanLight）
 lipro-smart-light-api/
 ├── README.md              本文件（中文）
 ├── SKILL.md               完整技术文档：API 细节、踩坑记录、字段语义
-├── .gitignore
+├── SECURITY.md            安全策略与漏洞报告方式
+├── NOTICE                 第三方致谢与版权声明
+├── LICENSE                MIT License
+├── .github/
+│   ├── CONTRIBUTING.md
+│   ├── CODE_OF_CONDUCT.md
+│   ├── PULL_REQUEST_TEMPLATE.md
+│   └── ISSUE_TEMPLATE/    bug_report / feature_request / question
 └── scripts/
     ├── lipro_ctl.sh       控制入口（bash 包装，负责加载凭据）
     ├── lipro_ctl.py       控制逻辑（构造请求体、写后轮询）
@@ -303,6 +310,7 @@ IoT 面返回的是**字符串** `"0000"`，跟数字 `0` 恒不相等 —— �
 本项目未直接复制其源码实现。
 
 MIT License 摘要：本项目代码以「现状」提供，不附带任何明示或默示担保。
+完整的第三方致谢与版权声明见 [NOTICE](NOTICE)。
 
 LIPRO 是魅族（MEIZU）旗下智能家居品牌，其云后端为魅族基础设施
 （`api-hilbert.lipro.com` 的 CNAME 指向 `mce-gateway.flyme.com`）。

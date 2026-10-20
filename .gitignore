@@ -25,3 +25,7 @@ venv/
 
 # macOS
 .DS_Store
+
+# WPS / 云盘同步产生的冲突副本
+*.sync-conflict-*
+*.conflict-*
