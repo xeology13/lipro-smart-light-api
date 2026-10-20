@@ -21,7 +21,7 @@ metadata:
 
 不适用：Hue / Aqara / Yeelight 等其他品牌（用对应厂商的官方集成）。
 
-## 免 HA 的只读客户端
+## 免 HA 的客户端
 
 `scripts/lipro_api.py` —— 纯 stdlib，不依赖 Home Assistant，**只读**（login / devices / group-state），
 **故意不含控制命令**。
@@ -87,7 +87,7 @@ IoT(控制)  : https://api-mlink.lipro.com
 固件清单    : https://lipro-share.lany.me
 ```
 
-**签名常量**（`const/api.py`，逆向自官方 App，公开仓库内）
+**签名常量**（逆向自官方 App；上游 Exlany/lipro-hass 公开了同值常量，MIT）
 ```python
 SMART_HOME_SIGN_KEY = "*Hilbert$@q9g"
 IOT_SIGN_KEY        = "19ff9eb20f818bc45ab216d0d67f"
@@ -111,7 +111,7 @@ sign = md5(f"{access_token}{nonce_ms}{MERCHANT_CODE}{body.strip()}{IOT_SIGN_KEY}
 Smart Home 面 (api-hilbert)  application/x-www-form-urlencoded   ← 表单编码
 IoT 面       (api-mlink)    application/json                    ← 签名覆盖 JSON body 原文
 ```
-源码依据：`request_gateway.py:132` 硬编码 `CONTENT_TYPE_FORM = "application/x-www-form-urlencoded"`。
+源码依据：上游 `request_gateway.py` 硬编码 `CONTENT_TYPE_FORM = "application/x-www-form-urlencoded"`。
 
 > **踩坑实录**：v1.0 脚本两个面都发 `application/json`，登录直接 **HTTP 404**。
 > 更坑的是 —— 网关把「body 编码不对」误判成「签名不对」，返回
@@ -121,7 +121,7 @@ IoT 面       (api-mlink)    application/json                    ← 签名覆�
 
 **成功码有三种形态，必须都认**（实测 2026-10-18）
 ```
-数字 0      Smart Home 面（const/api.py: RESPONSE_SUCCESS_CODES = frozenset((0, 200))）
+数字 0      Smart Home 面（上游 const/api.py: RESPONSE_SUCCESS_CODES = frozenset((0, 200))）
 字符串 "0000"  IoT 面实测返回 ← 字符串！与数字 0 比较恒不等
 缺省 None
 ```
@@ -315,7 +315,7 @@ isGroup         true
 ⚠️ **该提示有误导性** —— 真实原因只是 ID 空间不对，与设备硬件无关，
 不要照着提示去复位/重配网。源码依据：
 ```
-snapshot_support.py:138   assembly.group_ids.append(device.iot_device_id)
+snapshot_support.py       assembly.group_ids.append(device.iot_device_id)
 identifiers.py             _MESH_GROUP_ID_PATTERN = ^mesh_group_\d+$
 ```
 
@@ -382,9 +382,9 @@ $CTL <serial> --wait 20                         # 写后轮询上限秒（默认
 下发 POWER_OFF → code=0000, pushSuccess=true, 回读 powerState: 1→0  ← 三处都说成功
 物理          → 灯还亮着
 ```
-**`pushSuccess: true` 和回读都不是物理真相。** 上游 `is_command_push_failed()`
-（`result_policy.py:99`）只在 `pushSuccess` 明确为 false 时才判失败 —— 云端报 true 时
-上游也不会降级重试。**写后必须由人眼确认，不能只看回读。**
+**`pushSuccess: true` 和回读都不是物理真相。** 云端只在 `pushSuccess` 明确为
+false 时才判失败 —— 报 true 时不会降级重试。
+**写后必须由人眼确认，不能只看回读。**
 
 ### 坑 7：推断对 ≠ 结论对（我的思维错误）
 我推断「POWER_OFF 可能生效了，但被 7 秒后的亮度命令重新打开」——
@@ -474,7 +474,7 @@ bash scripts/lipro_ctl.sh --list
 ⚠️ rt 是**一次性**的（每次刷新即轮换），要存就必须每次刷新后回写。
 **高频调用时建议在 shell 层做缓存**（如 `direnv`），而不是在本项目里存。
 
-刷新端点（源码溯源 `auth_service.py:135`，实测可用）：
+刷新端点（参考上游 `auth_service.py`，实测可用）：
 ```
 POST /v1/user/token/refresh.do
 body: {"refreshToken": rtk, "model": "HomeAssistant"}

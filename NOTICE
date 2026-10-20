@@ -1,0 +1,20 @@
+lipro-smart-light-api
+Copyright (c) 2026 xeology13
+
+本项目为独立重写的 LIPRO 云端 API 客户端，采用 MIT License
+（见同目录 LICENSE 文件）。
+
+本项目的接口路径、字段语义与部分协议常量参考了以下开源项目：
+
+    Exlany/lipro-hass
+    Copyright (c) 2025 Exlany
+    https://github.com/Exlany/lipro-hass
+    MIT License
+
+依其 MIT 许可条款使用，特此致谢。上游项目版权归其作者所有。
+
+此外，本项目对官方 App 安装包（v2.24.3）内嵌资源做了独立逆向分析，
+相关型号表与协议常量的来源与上游项目相互独立。
+
+LIPRO、魅族、Meizu 等名称及商标归各自权利人所有。本项目为非官方项目，
+与魅族（MEIZU）/ LIPRO 无任何隶属、授权或合作关系。

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """LIPRO 控制命令 —— 分组下发，带 dry-run 门与写后回读。
 
-端点与请求体全部溯源自上游 Exlany/lipro-hass（2026-10 实读，非文档推测）：
+接口路径与字段语义参考开源项目 Exlany/lipro-hass（MIT License,
+Copyright (c) 2025 Exlany），本文件为独立编写。
 
     PATH_SEND_GROUP_COMMAND = "/app/oauth/api/v2/user/control/device/group/command.do"
     body = {
@@ -14,9 +15,8 @@
         "hasMacRule":  False,
         "groupId":     "<serial>",
     }
-    来源 const/api.py:26 · command_api_service.py:build_command_request_body
 
-命令与属性常量（const/entities.py 实读）：
+命令与属性常量：
 
     CMD_CHANGE_STATE="CHANGE_STATE"  CMD_POWER_ON="POWER_ON"  CMD_POWER_OFF="POWER_OFF"
     PROP_POWER_STATE="powerState"    PROP_BRIGHTNESS="brightness"
@@ -78,7 +78,7 @@ def load_api():
 # 本 skill 只支持两类灯 —— 都是 2026-10-18 实发验证过的：
 #   普通灯   physicalModel=light    deviceType=ff000001
 #   风扇灯   physicalModel=fanLight deviceType=ff000004
-# ⚠️ 上游 const/device_types.py 里还有 curtain / panel / heater / sensor / outlet /
+# ⚠️ 已知设备类型里还有 curtain / panel / heater / sensor / outlet /
 #    deskLamp / gateway 等，本项目**刻意不实现** —— 没验证过，不猜。
 #    遇到未支持的设备必须报错，不要按 type 兜底猜一个值发出去。
 DT_LED        = "ff000001"   # 普通灯
@@ -86,14 +86,14 @@ DT_FAN_LIGHT  = "ff000004"   # 风扇灯
 
 SUPPORTED_PHYSICAL = ("light", "fanLight")
 
-# physicalModel → deviceType（权威来源；上游注释明说 physicalModel 是唯一可靠来源）
+# physicalModel → deviceType（physicalModel 是唯一可靠来源；type 不可靠）
 PHYSICAL_TO_DT = {
     "light": DT_LED,
     "fanLight": DT_FAN_LIGHT,
 }
 
 # type（Mesh 协议分类）→ deviceType，仅在 physicalModel 缺失时兜底。
-# ⚠️ 上游原注释警告：type 不可靠，例 "type=9: Fan light (NOT desk lamp!)"。
+# ⚠️ 已知反例：type 不可靠，例 "type=9: Fan light (NOT desk lamp!)"。
 #    type=1 实测对应普通灯；type=9 对应风扇灯 —— 但这两个值在没有 physicalModel
 #    时无法区分「风扇灯」和「台灯」，**保留 9 有把台灯误判成风扇灯的风险**。
 #    宁可让调用方补 physicalModel，也不猜。

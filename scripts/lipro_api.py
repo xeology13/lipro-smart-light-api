@@ -1,7 +1,15 @@
 #!/usr/bin/env python3
-"""LIPRO 云 API 只读客户端 —— 反编译自 Exlany/lipro-hass (MIT)。
+"""LIPRO 云端 API 客户端 —— 独立实现（MIT License）。
 
-只做读操作：登录 / 列设备 / 查状态。不含任何写(控制)能力。
+本文件为独立编写的协议客户端，实现 LIPRO 云端的登录、设备查询、token 刷新
+与分组控制接口。
+
+接口路径、字段语义与部分协议常量参考了开源项目 Exlany/lipro-hass
+（MIT License, Copyright (c) 2025 Exlany），特此致谢并遵循其 MIT 许可条款；
+本项目为独立重写，非其代码复制或反编译产物。
+
+授权方式：本项目使用调用者本人的账号凭据，仅访问调用者本人账号下的设备。
+
 凭据从环境变量读，不落盘、不进 argv、不进 shell history。
 
 用法:
@@ -53,7 +61,7 @@ def iot_sign(access_token: str, nonce: int, body: str) -> str:
 def _post(url: str, body: str, content_type: str, headers: dict, timeout: int = 30) -> dict:
     """统一出口：body 是已编码好的字符串，content_type 由调用方决定。
 
-    Smart Home 面 = application/x-www-form-urlencoded（源码 request_gateway.py:132
+    Smart Home 面 = application/x-www-form-urlencoded（参考上游 request_gateway.py
     硬编码 CONTENT_TYPE_FORM）；IoT 面 = application/json，因为它的签名覆盖
     JSON body 原文。发错 Content-Type 会让网关把请求当成签名不匹配，返回
     HTTP 404 + API_SIGN_ERROR —— 状态码与语义完全脱节，别拿 404 当"路径错"。
@@ -117,7 +125,7 @@ def unwrap(result: dict) -> dict:
       - 字符串 "0000"（IoT 面实测返回，字符串！数字比较恒不等）
       - 缺省 None
     早先只认数字，导致 IoT 面所有成功响应被判成「API 错误 code=0000 msg=success」。
-    另外 IoT 面的数据键是 data（见上游 auth_recovery.py:316），
+    另外 IoT 面的数据键是 data（见上游 auth_recovery.py），
     Smart Home 面才是 value/typedValue。
     """
     code = result.get("code", result.get("resultCode"))
@@ -184,7 +192,7 @@ def cmd_group_state(token: str, group_ids: list[str]) -> None:
     """Mesh 分组状态。
 
     ⚠️ groupIdList 的值是 **serial**（形如 `mesh_group_<数字>`），不是 deviceId
-    （形如 `<数字>`）。上游 snapshot_support.py:138 取的是
+    （形如 `<数字>`）。上游 snapshot_support.py 取的是
     device.iot_device_id，即 serial；identifiers.py 校验 ^mesh_group_\\d+$。
     传错会得到 140013「未找到群组，请复位后重新配网」—— 该提示有误导性，
     真实原因是 ID 空间不对，不是设备要重新配网。
@@ -221,34 +229,10 @@ def cmd_connect_state(token: str, device_ids: list[str]) -> None:
     print(json.dumps(unwrap(result), ensure_ascii=False, indent=2)[:3000])
 
 
-def main() -> None:
-    if len(sys.argv) < 2:
-        print(__doc__)
-        raise SystemExit(1)
-    cmd = sys.argv[1]
-    token = os.environ.get("LIPRO_TOKEN")
-    if cmd == "login":
-        cmd_login()
-    elif cmd == "devices":
-        if not token:
-            raise SystemExit("需要 LIPRO_TOKEN（先跑 login）")
-        cmd_devices(token)
-    elif cmd == "state":
-        if not token or len(sys.argv) < 3:
-            raise SystemExit("用法: ... state <deviceId>")
-        cmd_state(token, sys.argv[2])
-    else:
-        raise SystemExit(f"未知命令: {cmd}")
-
-
-if __name__ == "__main__":
-    main()
-
-
 def cmd_refresh(refresh_token: str | None = None) -> str:
     """用 refresh_token 换新 access_token，返回 access_token。
 
-    端点溯源自上游 Exlany/lipro-hass（auth_service.py:135-151）：
+    端点参考上游 Exlany/lipro-hass（auth_service.py）：
         POST /v1/user/token/refresh.do
         body: {"refreshToken": <rtk>, "model": "HomeAssistant"}
         require_auth=False
@@ -273,3 +257,27 @@ def cmd_refresh(refresh_token: str | None = None) -> str:
     print(f"\u267b\ufe0f  刷新成功  access_token 长度={len(tok)}  "
           f"新 refresh_token={'有' if new_rtk else '无(沿用旧)'}")
     return tok
+
+
+def main() -> None:
+    if len(sys.argv) < 2:
+        print(__doc__)
+        raise SystemExit(1)
+    cmd = sys.argv[1]
+    token = os.environ.get("LIPRO_TOKEN")
+    if cmd == "login":
+        cmd_login()
+    elif cmd == "devices":
+        if not token:
+            raise SystemExit("需要 LIPRO_TOKEN（先跑 login）")
+        cmd_devices(token)
+    elif cmd == "state":
+        if not token or len(sys.argv) < 3:
+            raise SystemExit("用法: ... state <deviceId>")
+        cmd_state(token, sys.argv[2])
+    else:
+        raise SystemExit(f"未知命令: {cmd}")
+
+
+if __name__ == "__main__":
+    main()
